@@ -1,44 +1,51 @@
 #!/usr/bin/env python3
-"""Entry for make.fun bounty "news-image-20261124".
+"""Ship the finished front page for make.fun news-image-20261124.
 
-Copies the front-page image (entry.png, in this repository) to
-/output/entry.png, byte for byte, using only the standard library.
-No network is used. Every run writes identical bytes.
+The judged artifact is entry.png, which already lives in this repository.
+This script does not draw anything: it only checks the file is a real PNG
+under the bounty's 1 MiB cap and copies it, byte for byte, to the grading
+location. No network is touched, and every run writes identical bytes.
 
-Run locally:
+Usage:
     python3 main.py
-    # or, to write elsewhere:
     MAKEFUN_OUTPUT_DIR=out python3 main.py
 """
+
 import os
 import shutil
 import sys
 
-MAX_BYTES = 1 * 1024 * 1024  # 1 MiB, the bounty's image cap
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+# The bounty caps the delivered image at 1 MiB; anything bigger is rejected
+# before any copy happens.
+IMAGE_LIMIT = 1024 * 1024
 
 
-def main() -> int:
-    here = os.path.dirname(os.path.abspath(__file__))
-    src = os.path.join(here, "entry.png")
-    out_dir = os.environ.get("MAKEFUN_OUTPUT_DIR", "/output")
-    dst = os.path.join(out_dir, "entry.png")
+def fail(message):
+    print(f"error: {message}", file=sys.stderr)
+    return 1
 
-    with open(src, "rb") as f:
-        magic = f.read(8)
-    if magic != b"\x89PNG\r\n\x1a\n":
-        print("error: entry.png is not a PNG file", file=sys.stderr)
-        return 1
-    size = os.path.getsize(src)
-    if size > MAX_BYTES:
-        print(f"error: entry.png is {size} bytes, over the 1 MiB cap",
-              file=sys.stderr)
-        return 1
 
-    os.makedirs(out_dir, exist_ok=True)
-    shutil.copyfile(src, dst)
-    print(f"wrote {dst} ({size} bytes)")
+def run():
+    repo_root = os.path.dirname(os.path.abspath(__file__))
+    source = os.path.join(repo_root, "entry.png")
+    target_dir = os.environ.get("MAKEFUN_OUTPUT_DIR", "/output")
+    target = os.path.join(target_dir, "entry.png")
+
+    with open(source, "rb") as handle:
+        signature = handle.read(len(PNG_SIGNATURE))
+    if signature != PNG_SIGNATURE:
+        return fail("entry.png is not a PNG file")
+
+    size = os.path.getsize(source)
+    if size > IMAGE_LIMIT:
+        return fail(f"entry.png is {size} bytes, over the 1 MiB cap")
+
+    os.makedirs(target_dir, exist_ok=True)
+    shutil.copyfile(source, target)
+    print(f"wrote {target} - {size} bytes")
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(run())
